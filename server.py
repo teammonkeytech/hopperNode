@@ -1,6 +1,7 @@
 import flask
 import bcrypt
 import sqlalchemy as sa
+import json
 
 app = flask.Flask(__name__)
 engine = sa.create_engine("sqlite:///server.db") # for small servers
@@ -16,6 +17,10 @@ def init():
                     )
     metadata.create_all(engine, checkfirst=True)
 
+def decode(raw):
+    from base64 import urlsafe_b64decode
+    return dict(json.loads(urlsafe_b64decode(raw.encode("utf-8")).decode("utf-8")))
+
 @app.route("/api/authenticate")
 def auth():
     """
@@ -25,8 +30,7 @@ def auth():
     - new public key
     """
     raw = flask.request.args.get("data")
-    import base64, json
-    data = dict(json.loads(base64.urlsafe_b64decode(raw.encode("utf-8")).decode("utf-8")))
+    data = decode(raw)
     """
     TODO
     Should use the arguments in data (username, password, publicKey)
@@ -36,6 +40,37 @@ def auth():
     create encrypted messages readable only by the holder of the private key
     """
     return "Success"
+
+@app.route("/api/bubble")
+def bubbles():
+    """
+    Returns the list of "bubbles" (chatrooms) the user is a part of
+    """
+    raw = flask.request.args.get("data")
+    data = decode(raw)
+    """
+    TODO
+    Search for list of bubbles user is a part of and return that
+    """
+    bubbles = []
+    jsonedBubbles = json.dumps(bubbles)
+    return jsonedBubbles
+
+@app.route("/api/messageRequest")
+def messages():
+    """
+    Authenticate user and ensure that they are a part of the bubble
+    Returns the list of messages in the requested bubble
+    """
+    raw = flask.request.args.get("data")
+    data = decode(raw)
+    """
+    Authenticate user
+    Then return messages in current bubble
+    """
+    messages = []
+    jsonedMessages = json.dumps(messages)
+    return jsonedMessages
 
 
 if __name__ == "__main__":

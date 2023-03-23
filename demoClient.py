@@ -39,18 +39,43 @@ def keyTest(passwd):
     else:
         raise Exception("KeyNotValidError")
 
+def dataEncode(data):
+    from json import dumps
+    from base64 import urlsafe_b64encode
+    return urlsafe_b64encode(dumps(data).encode("utf-8")).decode("utf-8")
+
+def dataDecode(raw):
+    from json import loads
+    from base64 import urlsafe_b64decode
+    return dict(loads(urlsafe_b64decode(raw.encode("utf-8")).decode("utf-8")))
+
 def serverAuth(usn, passwd, publicKey):
     data = {
         "username": usn,
         "password": passwd,
         "publicKey": publicKey,
     }
-    from json import dumps
-    from base64 import b64encode
+    encodedData = dataEncode(data)
+    pg = requests.get(f"http://{HOSTNAME}:{PORT}/api/authenticate?data={encodedData}")
+    print(pg.text)
 
-    encodedData = b64encode(dumps(data).encode("utf-8")).decode("utf-8")
-    del dumps, b64encode
-    return requests.get(f"http://{HOSTNAME}:{PORT}/api/authenticate?data={encodedData}")
+def bubbleRequest(usn):
+    # Request a list of "bubbles" a user is a part of
+    data = {
+        "username": usn
+    }
+    encodedData = dataEncode(data)
+    return requests.get(f"http://{HOSTNAME}:{PORT}/api/bubble?data={encodedData}")
+
+def messageRequest(usn, passwd, bubbleID):
+    # Request a list of messages the user can view from the bubble
+    data = {
+        "username": usn,
+        "password": passwd,
+        "bubbleID": bubbleID,
+    }
+    encodedData = dataEncode(data)
+    return requests.get(f"http://{HOSTNAME}:{PORT}/api/messages?data={encodedData}")
 
 if __name__ == "__main__":
     # usn = input("Username: ")
@@ -65,4 +90,7 @@ if __name__ == "__main__":
     keys = readKey(passwd)
     publicKey = keys.public_key().export_key().decode("utf-8")
     serverAuth(usn, passwd, publicKey)
+    while True:
+        input("Message: ")
+
     

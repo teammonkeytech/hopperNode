@@ -1,0 +1,4 @@
+bcrypt
+pycryptdome
+requests
+sqlalchemy

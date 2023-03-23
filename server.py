@@ -7,13 +7,24 @@ app = flask.Flask(__name__)
 engine = sa.create_engine("sqlite:///server.db") # for small servers
 
 def init():
-    # creates table if it doesn't exist
+    # creates tables if it doesn't exist
     metadata = sa.MetaData()
     users = sa.Table("Users", metadata,
                     sa.Column("uid", sa.Integer, primary_key=True, unique=True, nullable=False),
                     sa.Column("username", sa.String(255), nullable=False),
                     sa.Column("passwordHash", sa.String(255), nullable=False),
                     sa.Column("publicKey", sa.String(255), nullable=False)
+                    )
+    bubbles = sa.Table("Bubbles", metadata,
+                    sa.Column("bid", sa.Integer, primary_key=True, unique=True, nullable=False),
+                    sa.Column("uid", sa.String(), nullable=True),
+                    )
+    msgs = sa.Table("Messages", metadata,
+                    sa.Column("mid", sa.Integer, primary_key=True, nullable=False),
+                    sa.Column("uidFrom", sa.Integer, nullable=False),
+                    sa.Column("uidTo", sa.Integer, nullable=False),
+                    sa.Column("timeStamp", sa.TIMESTAMP, nullable=False),
+                    sa.Column("content", sa.String(), nullable=False),
                     )
     metadata.create_all(engine, checkfirst=True)
 

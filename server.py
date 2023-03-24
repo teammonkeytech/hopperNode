@@ -30,10 +30,9 @@ def decode(raw):
     from base64 import urlsafe_b64decode
     return dict(json.loads(urlsafe_b64decode(raw.encode("utf-8")).decode("utf-8")))
 
-@app.route("/api/user/auth")
+@app.route("/api/user/auth", methods=["POST"])
 async def authUser():
-    raw = flask.request.args.get("data")
-    data = decode(raw)
+    data = flask.request.get_json()
     query = db.select(Users).where(Users.usn == data["usn"])
     storedUser = db.session.execute(query).fetchone()
     if storedUser != None:
@@ -55,20 +54,18 @@ async def authUser():
     db.session.commit()
     return "Registered"
 
-@app.route("/api/user/id")
+@app.route("/api/user/id", methods=["POST"])
 async def uid():
-    raw = flask.request.args.get("data")
-    data = decode(raw)
+    data = flask.request.get_json()
     query = db.select(Users).where(Users.usn == data["usn"])
     storedUser = db.session.execute(query).fetchone()
     if storedUser != None:
         return str(storedUser[0].uid)
     return f"User {data['usn']} not found"
 
-@app.route("/api/user/usn")
+@app.route("/api/user/usn", methods=["POST"])
 async def usn():
-    raw = flask.request.args.get("data")
-    data = decode(raw)
+    data = flask.request.get_json()
     query = db.select(Users).where(Users.uid == data["uid"])
     storedUser = db.session.execute(query).fetchone()
     if storedUser != None:
@@ -86,7 +83,7 @@ async def newRoom():
     db.session.commit()
     return "Created"
 
-@app.route("/api/bubble/uids")
+@app.route("/api/bubble/uids", methods=["POST"])
 async def bubble_uids():
     raw = flask.request.args.get("data")
     data = decode(raw)

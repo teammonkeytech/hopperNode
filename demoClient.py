@@ -3,8 +3,7 @@ from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
 from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256
 import requests
-from json import dumps, loads
-from base64 import urlsafe_b64encode, urlsafe_b64decode
+from json import loads
 
 BIT_LENGTH = 2048   # 1024, 2048, 3072 are available
 HOSTNAME = "localhost"
@@ -43,22 +42,16 @@ def keyTest(pwd):
     else:
         raise Exception("KeyNotValidError")
 
-def dataEncode(data):
-    return urlsafe_b64encode(dumps(data).encode("utf-8")).decode("utf-8")
-
-def dataDecode(raw):
-    return dict(loads(urlsafe_b64decode(raw.encode("utf-8")).decode("utf-8")))
-
 class User: 
     def __init__(self, usn = None, uid = None):
         if uid is not None:
-            self.usn = requests.get(f"http://{HOSTNAME}:{PORT}/api/user/usn?data={dataEncode({'uid': uid})}").text
+            self.usn = requests.post(f"http://{HOSTNAME}:{PORT}/api/user/usn", json={'uid': uid}).text
             self.uid = uid
-            self.pubKey = requests.get(f"http://{HOSTNAME}:{PORT}/api/user/pubKey?data={dataEncode({'usn': usn})}").text            
+            self.pubKey = requests.post(f"http://{HOSTNAME}:{PORT}/api/user/pubKey", json={'uid': uid}).text
         elif usn is not None:
             self.usn = usn
-            self.uid = int(requests.get(f"http://{HOSTNAME}:{PORT}/api/user/id?data={dataEncode({'usn': usn})}").text)
-            self.pubKey = requests.get(f"http://{HOSTNAME}:{PORT}/api/user/pubKey?data={dataEncode({'usn': usn})}").text            
+            self.uid = int(requests.post(f"http://{HOSTNAME}:{PORT}/api/user/id", json={'usn': usn}).text)
+            self.pubKey = requests.post(f"http://{HOSTNAME}:{PORT}/api/user/pubKey", json={'usn': usn}).text
         else:
             raise LookupError
 
@@ -78,8 +71,7 @@ class LocalUser(User):
             "pwd": self.pwd,
             "pubKey": self.pubKey,
         }
-        encodedData = dataEncode(data)
-        pg = requests.get(f"http://{HOSTNAME}:{PORT}/api/user/auth?data={encodedData}")
+        pg = requests.post(f"http://{HOSTNAME}:{PORT}/api/user/auth", json=data)
         print(pg.text)
 
     def sign(self, content):
@@ -95,7 +87,7 @@ class Bubble:
             self.connect()
     
     def connect(self):
-        self.uids = loads(requests.get(f"http://{HOSTNAME}:{PORT}/api/bubble/uids?data={dataEncode({'bid': self.bid})}").text)
+        self.uids = loads(requests.post(f"http://{HOSTNAME}:{PORT}/api/bubble/uids", json = {"bid", self.bid}).text)
 
 class Message:
     def __init__(self, author, bubble, content):
@@ -111,7 +103,7 @@ class Message:
             "content": self.content,
             "sig": self.signature,
         }
-        requests.get(f"http://{HOSTNAME}:{PORT}/api/msg/commit?data={dataEncode(data)}")
+        requests.post(f"http://{HOSTNAME}:{PORT}/api/msg/commit", json=data)
 
 if __name__ == "__main__":
     # usn = input("Username: ")

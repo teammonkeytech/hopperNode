@@ -10,7 +10,7 @@ db = SQLAlchemy()
 
 class Users(db.Model):
     uid = db.Column("uid", db.Integer, primary_key=True, unique=True, nullable=False)
-    usn = db.Column("usn", db.String(255), nullable=False)
+    usn = db.Column("usn", db.String(255), unique=True, nullable=False)
     pwdHash = db.Column("pwdHash", db.LargeBinary, nullable=False)
     pubKey = db.Column("pubKey", db.String(255), nullable=False)
 
@@ -24,6 +24,7 @@ class Messages(db.Model):
     bid = db.Column("bid", db.Integer, nullable=False)
     time = db.Column("time", db.TIMESTAMP, nullable=False)
     content = db.Column("content", db.String(), nullable=False)
+    sig = db.Column("sig", db.String(), nullable=False)
 
 def decode(raw):
     from base64 import urlsafe_b64decode
@@ -64,6 +65,16 @@ async def uid():
         return str(storedUser[0].uid)
     return f"User {data['usn']} not found"
 
+@app.route("/api/user/usn")
+async def usn():
+    raw = flask.request.args.get("data")
+    data = decode(raw)
+    query = db.select(Users).where(Users.uid == data["uid"])
+    storedUser = db.session.execute(query).fetchone()
+    if storedUser != None:
+        return storedUser[0].usn
+    return f"User {data['uid']} not found"
+
 @app.route("/api/bubble/new")
 async def newRoom():
     raw = flask.request.args.get("data")
@@ -74,6 +85,16 @@ async def newRoom():
     db.session.add(room)
     db.session.commit()
     return "Created"
+
+@app.route("/api/bubble/uids")
+async def bubble_uids():
+    raw = flask.request.args.get("data")
+    data = decode(raw)
+    query = db.select(Bubbles).where(Bubbles.bid == int(data["bid"]))
+    storedBubble = db.session.execute(query).fetchone()
+    if storedBubble != None:
+        return storedBubble[0].uids
+    return f"Bubble {data['bid']} not found"
 
 if __name__ == "__main__":
     db.init_app(app)

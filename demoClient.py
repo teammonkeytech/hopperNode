@@ -1,6 +1,10 @@
 from Crypto.Cipher import PKCS1_OAEP
+from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
 from Crypto.PublicKey import RSA
+from Crypto.Hash import SHA256
 import requests
+from json import dumps, loads
+from base64 import urlsafe_b64encode, urlsafe_b64decode
 
 BIT_LENGTH = 2048   # 1024, 2048, 3072 are available
 HOSTNAME = "localhost"
@@ -40,28 +44,33 @@ def keyTest(pwd):
         raise Exception("KeyNotValidError")
 
 def dataEncode(data):
-    from json import dumps
-    from base64 import urlsafe_b64encode
     return urlsafe_b64encode(dumps(data).encode("utf-8")).decode("utf-8")
 
 def dataDecode(raw):
-    from json import loads
-    from base64 import urlsafe_b64decode
     return dict(loads(urlsafe_b64decode(raw.encode("utf-8")).decode("utf-8")))
 
 class User: 
-    def __init__(self, usn):
-        self.usn = usn
-        self.uid = int(requests.get(f"http://{HOSTNAME}:{PORT}/api/user/id?data={dataEncode({'usn': usn})}").text)
-        self.pubKey = requests.get(f"http://{HOSTNAME}:{PORT}/api/user/pubKey?data={dataEncode({'usn': usn})}").text
+    def __init__(self, usn = None, uid = None):
+        if uid is not None:
+            self.usn = requests.get(f"http://{HOSTNAME}:{PORT}/api/user/usn?data={dataEncode({'uid': uid})}").text
+            self.uid = uid
+            self.pubKey = requests.get(f"http://{HOSTNAME}:{PORT}/api/user/pubKey?data={dataEncode({'usn': usn})}").text            
+        elif usn is not None:
+            self.usn = usn
+            self.uid = int(requests.get(f"http://{HOSTNAME}:{PORT}/api/user/id?data={dataEncode({'usn': usn})}").text)
+            self.pubKey = requests.get(f"http://{HOSTNAME}:{PORT}/api/user/pubKey?data={dataEncode({'usn': usn})}").text            
+        else:
+            raise LookupError
 
-
-class localUser(User):
+class LocalUser(User):
     def __init__(self, usn, pwd, keys):
+        self.usn = usn
         self.pwd = pwd
         self.keys = keys
+        self.auth()
         User.__init__(self, usn)
 
+    # convert into POST requests before deploy
     def auth(self):
         self.pubKey = self.keys.public_key().export_key().decode("utf-8")
         data = {
@@ -72,6 +81,37 @@ class localUser(User):
         encodedData = dataEncode(data)
         pg = requests.get(f"http://{HOSTNAME}:{PORT}/api/user/auth?data={encodedData}")
         print(pg.text)
+
+    def sign(self, content):
+        hash = SHA256.new(content.encode("utf-8"))
+        signer = PKCS115_SigScheme(self.keys)
+        return signer.sign(hash)
+
+class Bubble:
+    def __init__(self, bid = None):
+        self.bid = bid
+        self.uids = []
+        if self.bid is not None:
+            self.connect()
+    
+    def connect(self):
+        self.uids = loads(requests.get(f"http://{HOSTNAME}:{PORT}/api/bubble/uids?data={dataEncode({'bid': self.bid})}").text)
+
+class Message:
+    def __init__(self, author, bubble, content):
+        self.author = author
+        self.bubble = bubble
+        self.content = content
+        self.signature = author.sign(content)
+    
+    def commit(self):
+        data = {
+            "authUID": self.author.uid,
+            "bid": self.bubble.bid,
+            "content": self.content,
+            "sig": self.signature,
+        }
+        requests.get(f"http://{HOSTNAME}:{PORT}/api/msg/commit?data={dataEncode(data)}")
 
 if __name__ == "__main__":
     # usn = input("Username: ")
@@ -84,9 +124,10 @@ if __name__ == "__main__":
         input("Generate new keys? Reauthentication with server required")
         genKey(pwd)
     keys = readKey(pwd)
-    clientUser = localUser(usn, pwd, keys=keys)
-    clientUser.auth()
-    print(clientUser.uid)
+    clientUser = LocalUser(usn, pwd, keys=keys)
+    sessionBubble = Bubble()
+    newMessage = Message(author=clientUser, bubble=sessionBubble, content="Hello World")
+    newMessage.commit()
     # bubbleRequest([0, 1])
 
     

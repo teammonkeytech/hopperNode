@@ -1,4 +1,7 @@
 bcrypt
 pycryptodome
 requests
-sqlalchemy
+asyncio
+flask
+flask[async]
+Flask-SQLAlchemy

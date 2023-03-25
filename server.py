@@ -2,6 +2,7 @@ import flask
 import bcrypt
 import asyncio
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func
 import json
 
 app = flask.Flask(__name__)
@@ -27,7 +28,7 @@ class Messages(db.Model):
     mid = db.Column("mid", db.Integer, primary_key=True, nullable=False)
     authUID = db.Column("authUID", db.Integer, nullable=False)
     bid = db.Column("bid", db.Integer, nullable=False)
-    time = db.Column("time", db.Time, nullable=False)
+    time = db.Column("time", db.DateTime(timezone=True), server_default=func.now(), nullable=False)
     content = db.Column("content", db.String(), nullable=False)
     sig = db.Column("sig", db.String(), nullable=False)
 

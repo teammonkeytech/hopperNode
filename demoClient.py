@@ -114,6 +114,9 @@ class Bubble:
         return self.bid
     
     def getUids(self):
+        # try to connect to bubble if still at default value
+        if self.uids == []:
+            self.connect()
         return self.uids
 
     def connect(self):
@@ -148,15 +151,21 @@ class Message:
         self.signature = author.sign(content)
 
     def commit(self):
-        data = {
-            "authUID": self.author.uid,
-            "bid": self.bubble.bid,
-            "content": self.content,
-            "sig": self.signature,
-        }
-        pg = requests.post(
-            f"http://{HOSTNAME}:{PORT}/api/msg/commit", json=data)
-        print(pg)
+        for uid in self.bubble.getUids():
+            data = {"uid": uid}
+            pg = requests.post(
+                f"http://{HOSTNAME}:{PORT}/api/user/pubKey", json=data).text
+            cipher = PKCS1_OAEP.new(RSA.import_key(pg))
+            encryptedContent = cipher.encrypt(self.content.encode("utf-8"))
+            data = {
+                "authUID": self.author.uid,
+                "bid": self.bubble.bid,
+                "content": encryptedContent.hex(),
+                "sig": self.signature,
+            }
+            pg = requests.post(
+                f"http://{HOSTNAME}:{PORT}/api/msg/commit", json=data)
+            print(pg)
 
 
 if __name__ == "__main__":
@@ -177,5 +186,6 @@ if __name__ == "__main__":
     sessionBubble.invite(altUser)
     newMessage = Message(
         author=clientUser, bubble=sessionBubble, content="Hello World")
-    # newMessage.commit()
+    print(sessionBubble.getUids())
+    newMessage.commit()
     # bubbleRequest([0, 1])

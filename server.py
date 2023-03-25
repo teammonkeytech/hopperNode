@@ -94,7 +94,15 @@ async def upubkey():
 @app.route("/api/bubble/new", methods=["POST"])
 async def newRoom():
     data = flask.request.get_json()
+    # get largest bubble id so far
+    query = db.select(Bubbles).order_by(Bubbles.bid.desc())
+    bubbles = db.session.execute(query).fetchone()
+    if bubbles == None:
+        data["bid"] = 0
+    else:
+        data["bid"] = bubbles[0].bid + 1
     room = Bubbles(
+        bid=data["bid"],
         uid=data["uid"]
     )
     db.session.add(room)
@@ -107,13 +115,13 @@ async def checkRoomExist(bid):
     # returns True if room exists in db, False if not
     query = db.select(Bubbles).where(Bubbles.bid == bid)
     bubbles = db.session.execute(query).fetchone()
-    return len(bubbles) > 0
+    return bubbles is not None
 
 async def checkUserInRoom(bid, uid):
     # returns True if user is in the room, returns False is not
     query = db.select(Bubbles).where(Bubbles.bid == bid, Bubbles.uid == uid)
     bubbles = db.session.execute(query).fetchone()
-    return len(bubbles) != 0
+    return bubbles is not None
 
 @app.route("/api/bubble/invite", methods=["POST"])
 async def inviteToRoom():

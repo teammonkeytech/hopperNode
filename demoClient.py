@@ -171,9 +171,9 @@ if __name__ == "__main__":
         genKey(pwd)
     keys = readKey(pwd)
     clientUser = LocalUser(usn, pwd, keys=keys)
-    sessionBubble = Bubble(1)
-    # sessionBubble.new(clientUser.getUid())
-    altUser = User(usn="test")
+    sessionBubble = Bubble()
+    sessionBubble.new(clientUser)
+    altUser = User(usn="demo")
     sessionBubble.invite(altUser)
     newMessage = Message(
         author=clientUser, bubble=sessionBubble, content="Hello World")

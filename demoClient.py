@@ -159,20 +159,21 @@ class Message:
             encryptedContent = cipher.encrypt(self.content.encode("utf-8"))
             data = {
                 "authUID": self.author.uid,
+                "recipientUID": uid,
                 "bid": self.bubble.bid,
                 "content": encryptedContent.hex(),
                 "sig": self.signature,
             }
+            print(data)
             pg = requests.post(
                 f"http://{HOSTNAME}:{PORT}/api/msg/commit", json=data)
-            print(pg)
 
 
 if __name__ == "__main__":
-    # usn = input("Username: ")
-    # pwd = input("Password: ")
-    usn = "test"
-    pwd = "test"  # testing pwd replace when in production
+    usn = input("Username: ")
+    pwd = input("Password: ")
+    # usn = "test"
+    # pwd = "test"  # testing pwd replace when in production
     try:
         keyTest(pwd)
     except:

@@ -27,6 +27,7 @@ class Bubbles(db.Model):
 class Messages(db.Model):
     mid = db.Column("mid", db.Integer, primary_key=True, nullable=False)
     authUID = db.Column("authUID", db.Integer, nullable=False)
+    recipientUID = db.Column("recipeintUID", db.Integer, nullable=False)
     bid = db.Column("bid", db.Integer, nullable=False)
     time = db.Column("time", db.DateTime(timezone=True), server_default=func.now(), nullable=False)
     content = db.Column("content", db.String(), nullable=False)
@@ -154,8 +155,10 @@ async def bubbleUids():
 @app.route("/api/msg/commit", methods=["POST"])
 async def msgCommit():
     data = flask.request.get_json()
+    print(data)
     newMsg = Messages(
         authUID=data["authUID"],
+        recipientUID=data["recipientUID"],
         bid=data["bid"],
         content=data["content"],
         sig=data["sig"]

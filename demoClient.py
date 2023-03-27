@@ -2,6 +2,7 @@ from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
 from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256
+from base64 import b64decode, b64encode
 import requests
 from json import loads
 
@@ -45,6 +46,11 @@ def keyTest(pwd):
     else:
         raise Exception("KeyNotValidError")
 
+def bytesToString(byteData):
+    return b64encode(byteData).decode("utf-8")
+
+def stringToBytes(stringData):
+    return b64decode(stringData.encode("utf-8"))
 
 class User:
     def __init__(self, usn=None, uid=None, pubKey=None):
@@ -142,6 +148,17 @@ class Bubble:
         self.bid = requests.post(
             f"http://{HOSTNAME}:{PORT}/api/bubble/new", json=data).text
 
+    def msgRequest(self, localUser):
+        data = {
+            "uid": localUser.getUid(),
+            "bid": self.getBid(),
+        }
+        msgs = loads(requests.post(f"http://{HOSTNAME}:{PORT}/api/bubble/messageRequest", json=data).text)
+        # decrypt message
+        keys = localUser.getKeys()
+        cipher = PKCS1_OAEP.new(keys)
+        [msg.update({"content": cipher.decrypt(stringToBytes(msg["content"])).decode("utf-8")}) for msg in msgs]
+        return msgs
 
 class Message:
     def __init__(self, author, bubble, content):
@@ -161,10 +178,9 @@ class Message:
                 "authUID": self.author.uid,
                 "recipientUID": uid,
                 "bid": self.bubble.bid,
-                "content": encryptedContent.hex(),
+                "content": bytesToString(encryptedContent),
                 "sig": self.signature,
             }
-            print(data)
             pg = requests.post(
                 f"http://{HOSTNAME}:{PORT}/api/msg/commit", json=data)
 
@@ -187,6 +203,6 @@ if __name__ == "__main__":
     sessionBubble.invite(altUser)
     newMessage = Message(
         author=clientUser, bubble=sessionBubble, content="Hello World")
-    print(sessionBubble.getUids())
     newMessage.commit()
-    # bubbleRequest([0, 1])
+    print(sessionBubble.msgRequest(clientUser)
+)

@@ -61,8 +61,8 @@ class User:
             uid = int(requests.post(
                 f"http://{HOSTNAME}:{PORT}/api/user/id", json={'usn': usn}).text)
         if pubKey is None:
-            pubKey = requests.post(
-                f"http://{HOSTNAME}:{PORT}/api/user/pubKey", json={'uid': uid}).text
+            pubKey = RSA.import_key(requests.post(
+                f"http://{HOSTNAME}:{PORT}/api/user/pubKey", json={'uid': uid}).text)
         self.usn = usn
         self.uid = uid
         self.pubKey = pubKey
@@ -106,7 +106,7 @@ class LocalUser(User):
     def sign(self, content):
         hash = SHA256.new(content.encode("utf-8"))
         signer = PKCS115_SigScheme(self.getKeys())
-        return signer.sign(hash).hex()
+        return bytesToString(signer.sign(hash))
 
 
 class Bubble:
@@ -149,6 +149,14 @@ class Bubble:
             f"http://{HOSTNAME}:{PORT}/api/bubble/new", json=data).text
 
     def msgRequest(self, localUser):
+        def signTester(msg):
+            try:
+                signer = PKCS115_SigScheme(User(uid=msg["authUID"]).getPubKey())
+                newHash = SHA256.new(msg["content"].encode("utf-8"))
+                signer.verify(newHash, stringToBytes(msg["sig"]))
+                return True
+            except:
+                return False
         data = {
             "uid": localUser.getUid(),
             "bid": self.getBid(),
@@ -157,8 +165,18 @@ class Bubble:
         # decrypt message
         keys = localUser.getKeys()
         cipher = PKCS1_OAEP.new(keys)
-        [msg.update({"content": cipher.decrypt(stringToBytes(msg["content"])).decode("utf-8")}) for msg in msgs]
-        return msgs
+        signed = []
+        for msg in msgs:
+            """
+            Decrypt message
+            """
+            msg.update({"content": cipher.decrypt(stringToBytes(msg["content"])).decode("utf-8")})
+            """
+            Screen out invalid signatures
+            """
+            if signTester(msg):
+                signed.append(msg)
+        return signed
 
 class Message:
     def __init__(self, author, bubble, content):
@@ -169,10 +187,8 @@ class Message:
 
     def commit(self):
         for uid in self.bubble.getUids():
-            data = {"uid": uid}
-            pg = requests.post(
-                f"http://{HOSTNAME}:{PORT}/api/user/pubKey", json=data).text
-            cipher = PKCS1_OAEP.new(RSA.import_key(pg))
+            recipientUser = User(uid=uid)
+            cipher = PKCS1_OAEP.new(recipientUser.getPubKey())
             encryptedContent = cipher.encrypt(self.content.encode("utf-8"))
             data = {
                 "authUID": self.author.uid,
@@ -186,23 +202,13 @@ class Message:
 
 
 if __name__ == "__main__":
-    usn = input("Username: ")
-    pwd = input("Password: ")
-    # usn = "test"
-    # pwd = "test"  # testing pwd replace when in production
-    try:
-        keyTest(pwd)
-    except:
-        input("Generate new keys? Reauthentication with server required")
-        genKey(pwd)
-    keys = readKey(pwd)
-    clientUser = LocalUser(usn, pwd, keys=keys)
+    user1 = LocalUser("test", "test", readKey("test"))
+    genKey("test")
+    user2 = LocalUser("demo", "demo", readKey("test"))
     sessionBubble = Bubble()
-    sessionBubble.new(clientUser)
-    altUser = User(usn="demo")
-    sessionBubble.invite(altUser)
+    sessionBubble.new(user2)
+    sessionBubble.invite(user1)
     newMessage = Message(
-        author=clientUser, bubble=sessionBubble, content="Hello World")
+        author=user2, bubble=sessionBubble, content="Hello World")
     newMessage.commit()
-    print(sessionBubble.msgRequest(clientUser)
-)
+    print(sessionBubble.msgRequest(user2))

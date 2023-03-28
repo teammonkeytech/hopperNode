@@ -4,14 +4,15 @@ from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256
 from base64 import b64decode, b64encode
 import requests
-from json import loads
+from json import loads, dumps
 
 BIT_LENGTH = 2048   # 1024, 2048, 3072 are available
+PROTOCOL = "http"
 HOSTNAME = "localhost"
 PORT = "5000"
 
 
-def genKey(pwd):
+def genKey(pwd: str):
     """
     Generates a new key pair
     """
@@ -22,7 +23,7 @@ def genKey(pwd):
     print("New RSA Key Pair Generated")
 
 
-def readKey(pwd):
+def readKey(pwd: str):
     """
     Reads the key file and outputs the key pairing
     """
@@ -30,7 +31,7 @@ def readKey(pwd):
         return RSA.import_key(f.read(), passphrase=pwd)
 
 
-def keyTest(pwd):
+def keyTest(pwd: str):
     """
     Verifies if the key functions properly.
     """
@@ -46,14 +47,23 @@ def keyTest(pwd):
     else:
         raise Exception("KeyNotValidError")
 
-def bytesToString(byteData):
+def bytesToString(byteData: bytes):
+    """
+    Converts bytes into b64 encoded string
+    """
     return b64encode(byteData).decode("utf-8")
 
-def stringToBytes(stringData):
+def stringToBytes(stringData: str):
+    """
+    Converts b64 encoded string into bytes
+    """
     return b64decode(stringData.encode("utf-8"))
 
 class User:
-    def __init__(self, usn=None, uid=None, pubKey=None):
+    def __init__(self, usn: str=None, uid: int=None, pubKey: RSA.RsaKey=None):
+        """
+        Method to initialize user
+        """
         if usn is None:
             usn = requests.post(
                 f"http://{HOSTNAME}:{PORT}/api/user/usn", json={'uid': uid}).text
@@ -68,17 +78,32 @@ class User:
         self.pubKey = pubKey
 
     def getUsn(self):
+        """
+        Returns Username
+        """
         return self.usn
 
     def getUid(self):
+        """
+        Returns User ID
+        """
         return self.uid
 
     def getPubKey(self):
+        """
+        Returns the Public Key
+        """
         return self.pubKey
 
 
 class LocalUser(User):
-    def __init__(self, usn, pwd, keys):
+    """
+    Extends User class with manipulation of server data
+    """
+    def __init__(self, usn: str, pwd: str, keys: RSA.RsaKey):
+        """
+        Initializes Local User Class
+        """
         self.usn = usn
         self.pwd = pwd
         self.keys = keys
@@ -87,12 +112,22 @@ class LocalUser(User):
             self, usn=usn, pubKey=self.keys.public_key().export_key().decode("utf-8"))
 
     def getPwd(self):
+        """
+        Returns the Password
+        """
         return self.pwd
 
     def getKeys(self):
+        """
+        Returns the Private/Public Key Pairing
+        Use getPubKey from Class User for Public Key
+        """
         return self.keys
 
     def auth(self):
+        """
+        Registers public key with associated username and password combination
+        """
         self.pubKey = self.keys.public_key().export_key().decode("utf-8")
         data = {
             "usn": self.getUsn(),
@@ -110,27 +145,42 @@ class LocalUser(User):
 
 
 class Bubble:
-    def __init__(self, bid=None):
+    """
+    Class denoting chatrooms
+    """
+    def __init__(self, bid: int=None):
         self.bid = bid
         self.uids = []
         if self.bid is not None:
             self.connect()
 
     def getBid(self):
+        """
+        Returns attached Bubble ID
+        """
         return self.bid
     
     def getUids(self):
+        """
+        Returns User IDs attached to Bubble
+        """
         # try to connect to bubble if still at default value
         if self.uids == []:
             self.connect()
         return self.uids
 
-    def connect(self):
+    def connect(self, user: LocalUser):
+        """
+        Connects to Bubble and retrieves list of User IDs connected
+        """
         self.uids = loads(requests.post(
             f"http://{HOSTNAME}:{PORT}/api/bubble/uids", json={"bid": self.bid}).text)
         return self.getUids()
 
-    def invite(self, user):
+    def invite(self, user: User):
+        """
+        Invites a new user to the Bubble
+        """
         # for when you are already connected and want to add more users
         data = {
             "bid": self.getBid(),
@@ -140,7 +190,10 @@ class Bubble:
             f"http://{HOSTNAME}:{PORT}/api/bubble/invite", json=data).text
         print(status)
 
-    def new(self, user):
+    def new(self, user: User):
+        """
+        Creates a new Bubble
+        """
         # for when you want to create a new bubble
         data = {
             "uid": user.getUid(),
@@ -148,8 +201,14 @@ class Bubble:
         self.bid = requests.post(
             f"http://{HOSTNAME}:{PORT}/api/bubble/new", json=data).text
 
-    def msgRequest(self, localUser):
-        def signTester(msg):
+    def msgRequest(self, localUser: LocalUser):
+        """
+        Returns a list of messages where the signature is verified
+        """
+        def signTester(msg: Message):
+            """
+            Tests if the signature is valid
+            """
             try:
                 signer = PKCS115_SigScheme(User(uid=msg["authUID"]).getPubKey())
                 newHash = SHA256.new(msg["content"].encode("utf-8"))
@@ -179,13 +238,22 @@ class Bubble:
         return signed
 
 class Message:
-    def __init__(self, author, bubble, content):
+    """
+    Class for Messages
+    """
+    def __init__(self, author: User, bubble: Bubble, content: str):
+        """
+        Method to initialize new message
+        """
         self.author = author
         self.bubble = bubble
         self.content = content
         self.signature = author.sign(content)
 
     def commit(self):
+        """
+        Commits message and uploads it to the server encrypted with a signature
+        """
         for uid in self.bubble.getUids():
             recipientUser = User(uid=uid)
             cipher = PKCS1_OAEP.new(recipientUser.getPubKey())

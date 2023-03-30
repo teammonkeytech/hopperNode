@@ -27,8 +27,10 @@ class Bubbles(db.Model):
 class Messages(db.Model):
     mid = db.Column("mid", db.Integer, primary_key=True, nullable=False)
     authUID = db.Column("authUID", db.Integer, nullable=False)
+    recipientUID = db.Column("recipeintUID", db.Integer, nullable=False)
     bid = db.Column("bid", db.Integer, nullable=False)
-    time = db.Column("time", db.DateTime(timezone=True), server_default=func.now(), nullable=False)
+    time = db.Column("time", db.DateTime(timezone=True),
+                     server_default=func.now(), nullable=False)
     content = db.Column("content", db.String(), nullable=False)
     sig = db.Column("sig", db.String(), nullable=False)
 
@@ -82,6 +84,7 @@ async def usn():
         return storedUser[0].usn
     return f"User {data['uid']} not found"
 
+
 @app.route("/api/user/pubKey", methods=["POST"])
 async def upubkey():
     data = flask.request.get_json()
@@ -112,17 +115,20 @@ async def newRoom():
     # return the bid
     return str(room.bid)
 
+
 async def checkRoomExist(bid):
     # returns True if room exists in db, False if not
     query = db.select(Bubbles).where(Bubbles.bid == bid)
     bubbles = db.session.execute(query).fetchone()
     return bubbles is not None
 
+
 async def checkUserInRoom(bid, uid):
     # returns True if user is in the room, returns False is not
     query = db.select(Bubbles).where(Bubbles.bid == bid, Bubbles.uid == uid)
     bubbles = db.session.execute(query).fetchone()
     return bubbles is not None
+
 
 @app.route("/api/bubble/invite", methods=["POST"])
 async def inviteToRoom():
@@ -151,11 +157,32 @@ async def bubbleUids():
     return f"Bubble {data['bid']} not found"
 
 
+@app.route("/api/bubble/messageRequest", methods=["POST"])
+async def msgRequest():
+    """
+    API call to retrieve messages
+    """
+    data = flask.request.get_json()
+    # TODO only execute the code below if verified that the user is authenticated
+    query = db.select(Messages).where(Messages.recipientUID == int(
+        data["uid"])).where(Messages.bid == int(data["bid"]))
+    msgs = db.session.execute(query).fetchall()
+    formattedMSGS = [{
+        "authUID": msg[0].authUID,
+        "recipientUID": msg[0].recipientUID,
+        "bid": msg[0].bid,
+        "content": msg[0].content,
+        "sig": msg[0].sig,
+    } for msg in msgs]
+    return formattedMSGS
+
+
 @app.route("/api/msg/commit", methods=["POST"])
 async def msgCommit():
     data = flask.request.get_json()
     newMsg = Messages(
         authUID=data["authUID"],
+        recipientUID=data["recipientUID"],
         bid=data["bid"],
         content=data["content"],
         sig=data["sig"]

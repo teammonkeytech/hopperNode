@@ -1,2 +1,5 @@
-server.db
-keys.pem
+# Hide cache files
+*.pyc
+# Hide sensitive data containing files
+*.pem
+*/server.db
